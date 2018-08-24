@@ -13,7 +13,6 @@ function countdown([int]$b) {
         Write-Host 'finish'
         exit
     }
-    
         
         Write-Host $b
         Start-Sleep 1
@@ -21,7 +20,7 @@ function countdown([int]$b) {
         
         
     
-    
+
     
 }
 $input = Read-Host 'Input Number'
