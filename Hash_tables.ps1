@@ -4,6 +4,8 @@ $text = Get-Content -Path C:\Users\Vitali_Khmialnitski\Documents\learningPS\text
 $hash_Vars = [ordered]@{}
 
 foreach ($item in $vars) {
-   $hash_vars.add($item.Variable ,$item.Value)
+    $hash_vars.add($item.Variable , $item.Value)
 }
+
+
 
