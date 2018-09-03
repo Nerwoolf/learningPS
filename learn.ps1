@@ -122,5 +122,5 @@ process{
     }
 }
 end{
-    Get-AzureRmPublicIpAddress -ResourceGroupName $resourceGroup 
+    Get-AzureRmPublicIpAddress -ResourceGroupName $resourceGroup | Select-Object -Property ipaddress
 }
