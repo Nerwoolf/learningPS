@@ -4,6 +4,7 @@ param (
     $var3 = "123123"
 )
 begin{
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $uri = "https://www.papajohns.by/api/stock/codes"
     # some functions, varaibles
     #pre-configuration 
