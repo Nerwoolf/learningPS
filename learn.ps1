@@ -1,19 +1,10 @@
-<<<<<<< HEAD
-=======
 <#
 .SYNOPSIS
-    Short description
+    learn.ps1
 .DESCRIPTION
-    Long description
+    This script deploy VMs in high availability set  with Load balancer
 .EXAMPLE
-    PS C:\> <example usage>
-    Explanation of what the example does
-.INPUTS
-    Inputs (if any)
-.OUTPUTS
-    Output (if any)
-.NOTES
-    General notes
+
 #>
 param(
     [Parameter(Mandatory=$true)]
@@ -110,7 +101,7 @@ process{
    
     for($i=1; $i -le $VMNumber; $i++){
     
-        $vmConfig = New-AzureRmVMConfig -VMName "VM$i" -VMSize Standard_B2ms -AvailabilitySetId $availSet.Id | `
+        $vmConfig = New-AzureRmVMConfig -VMName "VM$i" -VMSize Standard_A2_v2 -AvailabilitySetId $availSet.Id | `
         Set-AzureRmVMOperatingSystem -Windows -ComputerName "VM$i" -Credential $cred | `
         Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer `
         -Skus 2016-Datacenter -Version latest | Add-AzureRmVMNetworkInterface -Id $nics[$i].id
@@ -131,6 +122,5 @@ process{
     }
 }
 end{
-    Get-AzureRmResource -ResourceGroupName test
+    Get-AzureRmPublicIpAddress -ResourceGroupName $resourceGroup 
 }
->>>>>>> 979192fa9fbed508ab766710661949f18d9104eb

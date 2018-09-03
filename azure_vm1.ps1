@@ -53,10 +53,18 @@
         
             for ($i=1; $i -le $vmNumber; $i++){
         # Create a virtual machine configuration
-        $vmConfig = New-AzureRmVMConfig -VMName "VM$i" -VMSize $vmSize -AvailabilitySetId $as.Id | `
-        Set-AzureRmVMOperatingSystem -Windows -ComputerName 'myVM2' -Credential $cred | `
-        Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer `
-        -Skus 2016-Datacenter -Version latest  
+                $credential =$cred
+                $LocationName = "westus"
+                $ResourceGroupName = "MyResourceGroup"
+                $ComputerName = "MyVM"
+                $VMName = "MyVM"
+                $VMSize = "Standard_DS3"
+                
+                $NetworkName = "MyNet"
+                $NICName = "MyNIC"
+                $SubnetName = "MySubnet"
+                $SubnetAddressPrefix = "10.0.0.0/24"
+                $VnetAddressPrefix = "10.0.0.0/16"
 
         # Create a virtual machine
         New-AzureRmVM -ResourceGroupName $resourceGroup -Location $location -VM $vmConfig
