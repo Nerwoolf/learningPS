@@ -8,7 +8,7 @@
 #>
 param(
     [Parameter(Mandatory=$true)]
-    [String]$resourceGroup = "crg",
+    [String]$resourceGroup = "newcrg",
 
     [Parameter(Mandatory=$true)]
     [String]$location = "westeurope",
@@ -142,14 +142,13 @@ process{
     $nics = @{}
     
     for($i=1; $i -le $VMNumber; $i++){
-        
+        #-NetworkSecurityGroup $nsg `
         $nics[$i] = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup `
                                                 -Location $location `
                                                 -Name "$vmName-$i-nic" `
                                                 -LoadBalancerBackendAddressPool $BEpool `
-                                                #-NetworkSecurityGroup $nsg `
                                                 -Subnet $virtNet.Subnets[0] `
-                                                -LoadBalancerInboundNatRule (Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $loadBalancer)[$i]
+                                                -LoadBalancerInboundNatRule (Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $loadBalancer)[$i-1]
     }
 
     # Create VM with configuring
@@ -157,7 +156,10 @@ process{
     
         $vmConfig = New-AzureRmVMConfig -VMName "$vmName-$i" `
                                         -VMSize $vmSize `
-                                        -AvailabilitySetId $availSet.Id |`
+                                        -AvailabilitySetId $availSet.Id | ` 
+                    Set-AzureRmVMBootDiagnostics -ResourceGroupName $resourceGroup `
+                                                 -Enable `
+                                                 -StorageAccountName $storAccount.StorageAccountName |`
                     Set-AzureRmVMOperatingSystem -Windows -ComputerName "$vmName-0$i" `
                                                  -Credential $cred | `
                     Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer `
