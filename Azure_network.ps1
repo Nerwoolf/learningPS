@@ -36,18 +36,7 @@ begin {
 
     # VMsize choosing
     $vmSize = 'Standard_A2'
-
-
-    # Security rules
-    $secRuleVars = @{
-        Access                   = 'Allow'
-        Protocol                 = 'Tcp' 
-        Direction                = 'Inbound'
-        SourceAddressPrefix      = "*"
-        SourcePortRange          = "*"
-        DestinationAddressPrefix = "*"
-    }
-    
+  
     # Connect to Azure
     try {
         Get-AzureRmSubscription
@@ -106,18 +95,16 @@ begin {
             }
             # Check for nsg exist and create if not
             if((Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroup) -ne $null){
-                write-host "Network security group already exist"
+                write-host ("Network security group already exist in {0} resource group" -f $ResourceGroup)
             }
             else {
                 # Security rules RDP and HTTP
-                $rules = @{
-                }
-                $rules.add = New-AzureRmNetworkSecurityRuleConfig -Name 'RDP-Input' @secRuleVars -DestinationPortRange '3389' -Priority 100
-                $rules.add = New-AzureRmNetworkSecurityRuleConfig -Name 'HTTP' @secRuleVars -DestinationPortRange '80' -Priority 101
+                $rule1 = New-AzureRmNetworkSecurityRuleConfig -Name 'RDP-Input' @secRuleVars -DestinationPortRange '3389' -Priority 100
+                $rule2 = New-AzureRmNetworkSecurityRuleConfig -Name 'HTTP' @secRuleVars -DestinationPortRange '80' -Priority 101
                 
                 # Creating network security group
-                Write-host "Now we are creating new network security group"
-                New-AzureRmNetworkSecurityGroup -name ("{0}-nsg-01" -f $ResourceGroup) -ResourceGroupName $ResourceGroup -Location $location -SecurityRules $rules
+                Write-host ("Now we are creating new network security group in {0}" -f $ResourceGroup)
+                New-AzureRmNetworkSecurityGroup -name ("{0}-nsg-01" -f $ResourceGroup) -ResourceGroupName $ResourceGroup -Location $location -SecurityRules $rule1, $rule2
             }
             
         }
@@ -132,9 +119,6 @@ begin {
             [String]$location,
 
             [Parameter(Mandatory=$true)]
-            [String]$VirtNetName,
-
-            [Parameter(Mandatory=$true)]
             [String]$IpPrefixVirtNet,
 
             [Parameter(Mandatory=$true)]
@@ -143,15 +127,15 @@ begin {
             )
 
             # Check an create virtual network and subnets
-            if(Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup -Name $VirtNetName -ErrorAction SilentlyContinue){
+            if((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup -ErrorAction SilentlyContinue) -ne $null){
                 Write-Host "Virtual network already exist"
             }
             else{
-
-                $vmSubnet = New-AzureRmVirtualNetworkSubnetConfig -Name ("{0}-vm-subnet" -f $ResourceGroup) -AddressPrefix $IpPrefixVM
+                $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroup
+                $vmSubnet = New-AzureRmVirtualNetworkSubnetConfig -Name ("{0}-vm-subnet" -f $ResourceGroup) -AddressPrefix $IpPrefixVM -NetworkSecurityGroup $nsg
                 New-AzureRmVirtualNetwork -Name ("{0}-vnet-01" -f $ResourceGroup) `
                                           -AddressPrefix $IpPrefixVirtNet `
-                                          -Subnet $vmSubnet, $gwSubnet `
+                                          -Subnet $vmSubnet `
                                           -ResourceGroupName $ResourceGroup `
                                           -Location $location
             }
@@ -168,7 +152,7 @@ begin {
 
             [String]$IpPrefixGateway
             )
-            $GwName = "{0}-gateway-01" -f $ResourceGroup
+            $GwName = ("{0}-gateway" -f $ResourceGroup)
 
             # Check for gateway exist and create if not
             $gw = Get-AzureRmVirtualNetworkGateway -ResourceGroupName $ResourceGroup -name $GwName -ErrorAction SilentlyContinue
@@ -213,7 +197,7 @@ begin {
                 $nic = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup `
                                                    -Location $location `
                                                    -Name ("{0}-nic-{1}" -f $VMName, $i) `
-                                                   -Subnet  ((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets| Where-Object -Property name -eq "$resourceGroup-subnet-01")
+                                                   -Subnet  ((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets| Where-Object -Property name -eq ("{0}-vm-subnet" -f $ResourceGroup))
 
                 $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -VMSize $vmSize 
 
@@ -231,7 +215,22 @@ begin {
         
     }
 process {
-    
+
+    create-StorAccount -ResourceGroup "moscow" -Location $location
+    create-StorAccount -ResourceGroup "paris" -Location $location
+
+    Create-NetSecGroup -ResourceGroup "moscow" -location $location
+    Create-NetSecGroup -ResourceGroup "paris" -location $location
+
+    Create-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    Create-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+
+
+
+
+
+
+
 
                                  
    
