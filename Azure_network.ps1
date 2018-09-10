@@ -8,41 +8,31 @@
     Explanation of what the example does
 #>
 param(
-    [Parameter(Mandatory = $true)]
-    [String]$resourceGroup1='paris',
+   # [Parameter(Mandatory = $true)]
+   # [String]$ResourceGroup1='paris',
 
     [Parameter(Mandatory = $true)]
-    [String]$resourceGroup2='moscow',
-
-    [Parameter(Mandatory = $true)]
-    [String]$location1='WestEurope',
-
-    [Parameter(Mandatory = $true)]
-    [String]$location2='WestEurope'
-    
-    
-              
+    [String]$location='WestEurope'
+       
 )
 begin {
     
     # VM admin credentials
     $cred = Get-Credential -Message "Please input creddentials for vm admin"
     $sharedKeyVnet = 'Test123'
-    $vmNumber = "1"
-    $vmName1 = $resourceGroup1+"web"
-    $vmName2 = $resourceGroup2+"web"
+
     
     # Network 1
-    $gwPrefix1  = "10.1.1.0/26"
-    $vmNetPrefix1 = "10.1.1.128/26"
-    $virtNetPrefix1 = "10.1.1.0/24"
-    $vpnClientPool1 = "10.1.5.0.24"
+    $virtNetPrefix1 = "10.1.0.0/16"
+    $vmNetPrefix1 = "10.1.1.0/24"
+    $gwPrefix1  = "10.1.2.0/27"
+    $vpnClientPool1 = "10.1.3.0/24"
 
     # Network 2
-    $vmNetPrefix2  = "10.1.2.0/26"
-    $gwPrefix2 = "10.1.2.128/26"
-    $virtNetPrefix2 = "10.1.2.0/24"
-    $vpnClientPool2 = "10.1.3.0.24"
+    $virtNetPrefix2 = "10.2.0.0/16"
+    $vmNetPrefix2  = "10.2.1.0/24"
+    $gwPrefix2 = "10.2.2.0/27"
+    $vpnClientPool2 = "10.2.3.0/24"
 
     # VMsize choosing
     $vmSize = 'Standard_A2'
@@ -67,140 +57,186 @@ begin {
     }
 
     # Create resource group
-        New-AzureRmResourceGroup -Name $resourceGroup1 -Location $location1
-        New-AzureRmResourceGroup -Name $resourceGroup2 -Location $location2
+        New-AzureRmResourceGroup -Name "moscow" -Location $location
+        New-AzureRmResourceGroup -Name "paris"  -Location $location
 
 
-    
+
         # Create new storage account
-        $storAccount1 = New-AzureRmStorageAccount -Name "$resourceGroup1`storage01" `
-                                                 -ResourceGroupName $resourceGroup1 `
-                                                 -Location $location1 `
+        function Create-StorAccount {
+            param(
+               
+                [Parameter(Mandatory = $true)]
+                [String]$ResourceGroup,
+            
+                [Parameter(Mandatory = $true)]
+                [String]$Location
+                
+            )
+            if((Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroup) -ne $null){
+                Write-host "Storage account already exist"
+            }
+            else{
+                Write-Host "Creating new storage account"
+                New-AzureRmStorageAccount -Name ("{0}storage01" -f $ResourceGroup) `
+                                                 -ResourceGroupName $resourceGroup `
+                                                 -Location $location `
                                                  -SkuName Standard_GRS `
                                                  -Kind StorageV2 
-        $storAccount2 = New-AzureRmStorageAccount -Name "$resourceGroup2`storage02" `
-                                                 -ResourceGroupName $resourceGroup2 `
-                                                 -Location $location2 `
-                                                 -SkuName Standard_GRS `
-                                                 -Kind StorageV2 
+            }
+        }                                      
+        function Create-NetSecGroup {
+            param(
+                
+            [Parameter(Mandatory=$true)]
+            [String]$ResourceGroup,
 
-}
+            [Parameter(Mandatory=$true)]
+            [String]$location
+
+            )
+            # Defaults for rule 
+            $secRuleVars = @{
+                Access = 'Allow'
+                Protocol = 'Tcp' 
+                Direction = 'Inbound'
+                SourceAddressPrefix = "*"
+                SourcePortRange = "*"
+                DestinationAddressPrefix = "*"
+            }
+            # Check for nsg exist and create if not
+            if((Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroup) -ne $null){
+                write-host "Network security group already exist"
+            }
+            else {
+                # Security rules RDP and HTTP
+                $rules = @{
+                }
+                $rules.add = New-AzureRmNetworkSecurityRuleConfig -Name 'RDP-Input' @secRuleVars -DestinationPortRange '3389' -Priority 100
+                $rules.add = New-AzureRmNetworkSecurityRuleConfig -Name 'HTTP' @secRuleVars -DestinationPortRange '80' -Priority 101
+                
+                # Creating network security group
+                Write-host "Now we are creating new network security group"
+                New-AzureRmNetworkSecurityGroup -name ("{0}-nsg-01" -f $ResourceGroup) -ResourceGroupName $ResourceGroup -Location $location -SecurityRules $rules
+            }
+            
+        }
+        function Create-VMNetwork {
+
+            param (
+
+            [Parameter(Mandatory=$true)]
+            [String]$ResourceGroup,
+
+            [Parameter(Mandatory=$true)]
+            [String]$location,
+
+            [Parameter(Mandatory=$true)]
+            [String]$VirtNetName,
+
+            [Parameter(Mandatory=$true)]
+            [String]$IpPrefixVirtNet,
+
+            [Parameter(Mandatory=$true)]
+            [String]$IpPrefixVM
+
+            )
+
+            # Check an create virtual network and subnets
+            if(Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup -Name $VirtNetName -ErrorAction SilentlyContinue){
+                Write-Host "Virtual network already exist"
+            }
+            else{
+
+                $vmSubnet = New-AzureRmVirtualNetworkSubnetConfig -Name ("{0}-vm-subnet" -f $ResourceGroup) -AddressPrefix $IpPrefixVM
+                New-AzureRmVirtualNetwork -Name ("{0}-vnet-01" -f $ResourceGroup) `
+                                          -AddressPrefix $IpPrefixVirtNet `
+                                          -Subnet $vmSubnet, $gwSubnet `
+                                          -ResourceGroupName $ResourceGroup `
+                                          -Location $location
+            }
+            
+        }
+        function Create-VnetGateway {
+            param (
+                
+            [Parameter(Mandatory=$true)]
+            [String]$ResourceGroup,
+
+            [Parameter(Mandatory=$true)]
+            [String]$location,
+
+            [String]$IpPrefixGateway
+            )
+            $GwName = "{0}-gateway-01" -f $ResourceGroup
+
+            # Check for gateway exist and create if not
+            $gw = Get-AzureRmVirtualNetworkGateway -ResourceGroupName $ResourceGroup -name $GwName -ErrorAction SilentlyContinue
+            if($gw -ne $null){
+                Write-Host ("{0} gateway already exist" -f $GwName)
+            }
+            else {
+            # Check for gateway subnet
+            $virtNet = Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup
+            $gwSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet -Name "gatewaysubnet" -ErrorAction SilentlyContinue
+                if($gwSubnet -ne $null){
+                    Wite-host "Gateway subnet already exist"
+                }
+                else {
+                    $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
+                    $virtNet | Set-AzureRmVirtualNetwork
+                }
+                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic
+                $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
+                New-AzureRmVirtualNetworkGateway -Name ("{0}-gateway" -f $ResourceGroup)`
+                                                 -ResourceGroupName $ResourceGroup `
+                                                 -Location $location `
+                                                 -IpConfigurations $gwConfig `
+                                                 -GatewayType Vpn `
+                                                 -VpnType RouteBased `
+                                                 -GatewaySku VpnGw1
+            }
+            
+        }
+        function  Create-azureRmVM {
+            param (
+                [Parameter(Mandatory=$true)]
+                [String]$ResourceGroup,
+                [String]$location,
+                [String]$VMName,
+                [String]$VMSize,
+                [String]$AvailabilitySetId,
+                [String]$VMNumber
+            )
+     
+            for($i=1; $i -le $VMNumber; $i++){
+                $nic = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup `
+                                                   -Location $location `
+                                                   -Name ("{0}-nic-{1}" -f $VMName, $i) `
+                                                   -Subnet  ((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets| Where-Object -Property name -eq "$resourceGroup-subnet-01")
+
+                $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -VMSize $vmSize 
+
+                $vmConfig | Set-AzureRmVMBootDiagnostics -ResourceGroupName $resourceGroup -Enable -StorageAccountName (Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroup).StorageAccountName
+
+                $vmConfig | Set-AzureRmVMOperatingSystem -Windows -ComputerName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -Credential $cred
+
+                $vmConfig |  Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2016-Datacenter -Version latest
+                
+                $vmConfig | Add-AzureRmVMNetworkInterface -Id $nic.id
+        
+                New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig
+            }
+        }
+        
+    }
 process {
     
-     # Create Availbility set
-        $availSet1 = New-AzureRmAvailabilitySet -ResourceGroup $resourceGroup1 `
-        -Location $location1 `
-        -name "$resourceGroup1-availset-01" `
-        -PlatformUpdateDomainCount 2 `
-        -PlatformFaultDomainCount 2 `
-        -Sku Aligned
 
-        $availSet2 = New-AzureRmAvailabilitySet -ResourceGroup $resourceGroup2 `
-        -Location $location2 `
-        -name "$resourceGroup2-availset-02" `
-        -PlatformUpdateDomainCount 2 `
-        -PlatformFaultDomainCount 2 `
-        -Sku Aligned
-
-    # Create NSG Rules 
-    $rule1 = New-AzureRmNetworkSecurityRuleConfig -Name 'RDP-Allow' @secRuleVars -Priority 100 -DestinationPortRange 3389
-    $rule2 = New-AzureRmNetworkSecurityRuleConfig -Name 'HTTP-Allow' @secRuleVars -Priority 101 -DestinationPortRange 80
-
-    # Create NetworkSecurity group 
-    $nsg1 = New-AzureRmNetworkSecurityGroup -Name "$resourceGroup1-nsg-01" `
-        -ResourceGroup $resourceGroup1 `
-        -Location $location1 `
-        -SecurityRules $rule1, $rule2
-
-    $nsg2 = New-AzureRmNetworkSecurityGroup -Name "$resourceGroup2-nsg-02" `
-        -ResourceGroup $resourceGroup2 `
-        -Location $location2 `
-        -SecurityRules $rule1, $rule2
+                                 
    
-    # Add VM and Gateway subnets to virtual network
-    $GwSubnet1 = new-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" `
-        -AddressPrefix $GwPrefix1 -NetworkSecurityGroup $nsg1
-    
-    $vmSubnet1 = new-AzureRmVirtualNetworkSubnetConfig -Name "$resourceGroup1-subnet-01" `
-        -AddressPrefix $vmNetPrefix1 -NetworkSecurityGroup $nsg1
-
-    $GwSubnet2 = new-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" `
-        -AddressPrefix $GwPrefix2 -NetworkSecurityGroup $nsg2
-    
-    $vmSubnet2 = new-AzureRmVirtualNetworkSubnetConfig -Name "$resourceGroup2-subnet-02" `
-        -AddressPrefix $vmNetPrefix2 -NetworkSecurityGroup $nsg2
-      
-
-    # Create virtual network
-    $virtNet1 = New-AzureRmVirtualNetwork -Name "$resourceGroup1-vnet-01" `
-                                         -AddressPrefix $virtNetPrefix1 `
-                                         -ResourceGroupName $resourceGroup1 `
-                                         -Location $location1 `
-                                         -Subnet $vmSubnet1, $GwSubnet1
-
-    $virtNet2 = New-AzureRmVirtualNetwork -Name "$resourceGroup2-vnet-02" `
-                                         -AddressPrefix $virtNetPrefix2 `
-                                         -ResourceGroupName $resourceGroup2 `
-                                         -Location $location2 `
-                                         -Subnet $vmSubnet2, $GwSubnet2
-   
-    # Create public ip
-    $pubIp1 = New-AzureRmPublicIpAddress -Name "$resourceGroup1-pip-01" `
-        -ResourceGroupName $resourceGroup1 `
-        -Location $location1 `
-        -AllocationMethod Dynamic
-
-    $pubIp2 = New-AzureRmPublicIpAddress -Name "$resourceGroup2-pip-01" `
-        -ResourceGroupName $resourceGroup2 `
-        -Location $location2 `
-        -AllocationMethod Dynamic
-    
-
-    # Create ipconfiguration for Virtual Gateway
-    $vnGWconfig1 = New-AzureRmVirtualNetworkGatewayIpConfig -Name "$resourceGroup1-vngwconfig" `
-        -PublicIpAddress $pubIp1 `
-        -Subnet (Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet1 | Where-Object -Property Name -eq "gatewaysubnet")
-
-    $vnGWconfig2 = New-AzureRmVirtualNetworkGatewayIpConfig -Name "$resourceGroup2-vngwconfig" `
-        -PublicIpAddress $pubIp2 `
-        -Subnet (Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet2 | Where-Object -Property Name -eq "gatewaysubnet")
-
-    # Create Virtual Network Gateway
-    $vnGW1 = New-AzureRmVirtualNetworkGateway -Name "$resourceGroup1-gateway-01" `
-        -ResourceGroupName $resourceGroup1 `
-        -Location $location1 `
-        -IpConfigurations $vnGWconfig1 `
-        -GatewayType Vpn `
-        -VpnType RouteBased `
-        -GatewaySku Basic `
-        -AsJob
-
-    $vnGW2 = New-AzureRmVirtualNetworkGateway -Name "$resourceGroup2-gateway-01" `
-        -ResourceGroupName $resourceGroup2 `
-        -Location $location2 `
-        -IpConfigurations $vnGWconfig2 `
-        -GatewayType Vpn `
-        -VpnType RouteBased `
-        -GatewaySku Basic `
-        -AsJob
-    
-    # Create vnet connection
-    $vnetConnect1 = New-AzureRmVirtualNetworkGatewayConnection -Name "$resourceGroup1-$resourceGroup2-connect" `
-                                                              -VirtualNetworkGateway1 $vnGW1 `
-                                                              -VirtualNetworkGateway2 $vnGW2 `
-                                                              -ResourceGroupName $resourceGroup1 `
-                                                              -Location $location1 `
-                                                              -sharedkey $sharedKeyVnet `
-                                                              -ConnectionType Vnet2Vnet
-    $vnetConnect2 = New-AzureRmVirtualNetworkGatewayConnection -Name "$resourceGroup2-$resourceGroup1-connect" `
-                                                              -VirtualNetworkGateway1 $vnGW2 `
-                                                              -VirtualNetworkGateway2 $vnGW1 `
-                                                              -ResourceGroupName $resourceGroup2 `
-                                                              -Location $location2 `
-                                                              -sharedkey $sharedKeyVnet `
-                                                              -ConnectionType Vnet2Vnet
-
-    # Generate new certificate 
+   #>     
+   <# # Generate new certificate 
     $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
                                       -Subject "CN=P2SRootCert" -KeyExportPolicy Exportable `
                                       -HashAlgorithm sha256 -KeyLength 2048 `
@@ -210,41 +246,9 @@ process {
                                       -HashAlgorithm sha256 -KeyLength 2048 `
                                       -CertStoreLocation "Cert:\CurrentUser\My" `
                                       -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
+    #>
 
-    # Set pool for VPN
-    Set-AzureRmVirtualNetworkGatewayVpnClientConfig -VirtualNetworkGateway $vnGW1 -VpnClientAddressPool "192.168.20.0/24"
-  # Create network adapters
-  $nics = @{} 
-    
-  for($i=1; $i -le $VMNumber; $i++){
-      #-NetworkSecurityGroup $nsg `
-      $nics[$i] = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup1 `
-                                              -Location $location1 `
-                                              -Name "$vmName-$i-nic" `
-                                              -Subnet $virtNet.Subnets[1]
-                            
-  }
-    
-    # Create VM with configuring
-    for($i=1; $i -le $VMNumber; $i++){
-    
-        $vmConfig = New-AzureRmVMConfig -VMName "$vmName-$i" `
-                                        -VMSize $vmSize `
-                                        -AvailabilitySetId $availSet.Id | ` 
-                    Set-AzureRmVMBootDiagnostics -ResourceGroupName $resourceGroup1 `
-                                                 -Enable `
-                                                 -StorageAccountName $storAccount.StorageAccountName |`
-                    Set-AzureRmVMOperatingSystem -Windows -ComputerName "$vmName-0$i" `
-                                                 -Credential $cred | `
-                    Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer `
-                                             -Offer WindowsServer `
-                                             -Skus 2016-Datacenter `
-                                             -Version latest |`
-                    Add-AzureRmVMNetworkInterface -Id $nics[$i].id
-
-        New-AzureRmVM -ResourceGroup $resourceGroup1 -Location $location1 -VM $vmConfig 
-    }
 }
 end {
-    add-newazurermvirtualnetrowksubnetconfig 
+    
 }
