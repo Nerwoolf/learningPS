@@ -16,10 +16,10 @@ param(
        
 )
 begin {
-    
+
     # VM admin credentials
     $cred = Get-Credential -Message "Please input creddentials for vm admin"
-    $sharedKeyVnet = 'Test123'
+    $sharedKeyVnet = '2wsx3edC'
 
     
     # Network 1
@@ -51,8 +51,8 @@ begin {
 
 
 
-        # Create new storage account
-        function Create-StorAccount {
+        # Function to create new storage account
+        function new-StorAccount {
             param(
                
                 [Parameter(Mandatory = $true)]
@@ -73,10 +73,12 @@ begin {
                                                  -SkuName Standard_GRS `
                                                  -Kind StorageV2 
             }
-        }                                      
-        function Create-NetSecGroup {
+        } 
+
+        # This function creating security group                                     
+        function new-NetSecGroup {
             param(
-                
+
             [Parameter(Mandatory=$true)]
             [String]$ResourceGroup,
 
@@ -108,8 +110,9 @@ begin {
             }
             
         }
-        function Create-VMNetwork {
 
+        # Function to create virtual network
+        function new-VMNetwork {
             param (
 
             [Parameter(Mandatory=$true)]
@@ -141,7 +144,9 @@ begin {
             }
             
         }
-        function Create-VnetGateway {
+        
+        # Function to create virtual network Gateway
+        function new-VnetGateway {
             param (
                 
             [Parameter(Mandatory=$true)]
@@ -182,7 +187,51 @@ begin {
             }
             
         }
-        function  Create-azureRmVM {
+
+        # Function add Vnet connection to gateway 
+        function new-VnetConnection {
+            param(
+                [Parameter(Mandatory=$true)]
+                [String]$ResourceGroup,
+
+                [Parameter(Mandatory=$true)]
+                [String]$location,
+
+                [Parameter(Mandatory=$true)]
+                [String]$ConnectionDSTResGroup,
+
+                [Parameter(Mandatory=$true)]
+                [String]$SharedKey,
+                
+                [Parameter(Mandatory=$true)]
+                [ValidateSet("ipsec","vnet2vnet","vpnclinet")]
+                [String]$ConnectionType
+
+            )
+
+            # Check for gateways exist
+            try {
+                $gw1 = get-azurermvirtualnetworkgateway -ResourceGroupName $ResourceGroup
+                $gw2 = get-azurermvirtualnetworkgateway -ResourceGroupName $ConnectionDSTResGroup
+            }
+            catch{
+                Write-host "Gateways not founded"
+            }
+            if(($gw1 -ne $null) -and ($gw2 -ne $null)){
+            
+            New-AzureRmVirtualNetworkGatewayConnection -Name ("{0}-{1}-connection" -f $resourcegroup, $ConnectionDSTResGroup) `
+                                                       -ResourceGroupName $ResourceGroup `
+                                                       -location $location `
+                                                       -VirtualNetworkGateway1 $gw1 `
+                                                       -VirtualNetworkGateway2 $gw2 `
+                                                       -SharedKey $SharedKey `
+                                                       -ConnectionType $ConnectionType
+            
+            }
+        }
+
+        # This function create VM with network interface and add it to network security group 
+        function  new-azureVM {
             param (
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
@@ -208,14 +257,16 @@ begin {
                 $vmConfig |  Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2016-Datacenter -Version latest
                 
                 $vmConfig | Add-AzureRmVMNetworkInterface -Id $nic.id
-        
+                
                 New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig
             }
         }
         
+        
     }
 process {
 
+<<<<<<< HEAD
     create-StorAccount -ResourceGroup "moscow" -Location $location
     create-StorAccount -ResourceGroup "paris" -Location $location
 
@@ -227,25 +278,22 @@ process {
 
     Create-VnetGateway -ResourceGroup "moscow" -location $location -IpPrefixGateway $gwPrefix1
     Create-VnetGateway -ResourceGroup "paris" -location $location -IpPrefixGateway $gwPrefix2
+=======
+    new-StorAccount -ResourceGroup "moscow" -Location $location
+    new-StorAccount -ResourceGroup "paris" -Location $location
+>>>>>>> e46a330b1378e102c9a39f16f136060fd8c724b4
+
+    new-NetSecGroup -ResourceGroup "moscow" -location $location
+    new-NetSecGroup -ResourceGroup "paris" -location $location
+
+    new-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    new-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+
+    new-VnetConnection -ResourceGroup "moscow" -location $location -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+    new-VnetConnection -ResourceGroup "paris" -location $location -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
 
 
-
-
-
-                                 
-   
-   #>     
-   <# # Generate new certificate 
-    $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
-                                      -Subject "CN=P2SRootCert" -KeyExportPolicy Exportable `
-                                      -HashAlgorithm sha256 -KeyLength 2048 `
-                                      -CertStoreLocation "Cert:\CurrentUser\My" -KeyUsageProperty Sign -KeyUsage CertSign
-    New-SelfSignedCertificate -Type Custom -DnsName P2SChildCert -KeySpec Signature `
-                                      -Subject "CN=P2SChildCert" -KeyExportPolicy Exportable `
-                                      -HashAlgorithm sha256 -KeyLength 2048 `
-                                      -CertStoreLocation "Cert:\CurrentUser\My" `
-                                      -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
-    #>
+    new-azureVM -ResourceGroup "moscow" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
 
 }
 end {
