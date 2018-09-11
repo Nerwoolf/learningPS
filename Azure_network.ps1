@@ -164,13 +164,13 @@ begin {
             $virtNet = Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup
             $gwSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet -Name "gatewaysubnet" -ErrorAction SilentlyContinue
                 if($gwSubnet -ne $null){
-                    Wite-host "Gateway subnet already exist"
+                    Write-host "Gateway subnet already exist"
                 }
                 else {
                     $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
                     $virtNet | Set-AzureRmVirtualNetwork
                 }
-                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic
+                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic -Location  $location
                 $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
                 New-AzureRmVirtualNetworkGateway -Name ("{0}-gateway" -f $ResourceGroup)`
                                                  -ResourceGroupName $ResourceGroup `
@@ -225,8 +225,8 @@ process {
     Create-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
     Create-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
 
-
-
+    Create-VnetGateway -ResourceGroup "moscow" -location $location -IpPrefixGateway $gwPrefix1
+    Create-VnetGateway -ResourceGroup "paris" -location $location -IpPrefixGateway $gwPrefix2
 
 
 
