@@ -52,7 +52,7 @@ begin {
 
 
         # Function to create new storage account
-        function Create-StorAccount {
+        function new-StorAccount {
             param(
                
                 [Parameter(Mandatory = $true)]
@@ -76,7 +76,7 @@ begin {
         } 
 
         # This function creating security group                                     
-        function Create-NetSecGroup {
+        function new-NetSecGroup {
             param(
 
             [Parameter(Mandatory=$true)]
@@ -112,7 +112,7 @@ begin {
         }
 
         # Function to create virtual network
-        function Create-VMNetwork {
+        function new-VMNetwork {
             param (
 
             [Parameter(Mandatory=$true)]
@@ -146,7 +146,7 @@ begin {
         }
         
         # Function to create virtual network Gateway
-        function Create-VnetGateway {
+        function new-VnetGateway {
             param (
                 
             [Parameter(Mandatory=$true)]
@@ -189,7 +189,7 @@ begin {
         }
 
         # Function add Vnet connection to gateway 
-        function Create-Vnet-Connection {
+        function new-VnetConnection {
             param(
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
@@ -231,7 +231,7 @@ begin {
         }
 
         # This function create VM with network interface and add it to network security group 
-        function  Create-azureRmVM {
+        function  new-azureVM {
             param (
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
@@ -266,20 +266,20 @@ begin {
     }
 process {
 
-    create-StorAccount -ResourceGroup "moscow" -Location $location
-    create-StorAccount -ResourceGroup "paris" -Location $location
+    new-StorAccount -ResourceGroup "moscow" -Location $location
+    new-StorAccount -ResourceGroup "paris" -Location $location
 
-    Create-NetSecGroup -ResourceGroup "moscow" -location $location
-    Create-NetSecGroup -ResourceGroup "paris" -location $location
+    new-NetSecGroup -ResourceGroup "moscow" -location $location
+    new-NetSecGroup -ResourceGroup "paris" -location $location
 
-    Create-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
-    Create-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+    new-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    new-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
 
-    Create-Vnet-Connection -ResourceGroup "moscow" -location $location -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
-    Create-Vnet-Connection -ResourceGroup "paris" -location $location -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+    new-VnetConnection -ResourceGroup "moscow" -location $location -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+    new-VnetConnection -ResourceGroup "paris" -location $location -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
 
 
-    Create-azureRmVM -ResourceGroup "moscow" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
+    new-azureVM -ResourceGroup "moscow" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
 
 }
 end {
