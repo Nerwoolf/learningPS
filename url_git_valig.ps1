@@ -19,12 +19,11 @@ function Check-Branchname() {
         $resultMessageValid = "Path is correct"
         $resultMessageFail = "Path is not correct"
         # Regex pattern for path validating
-        $pathValidateRegex = "^(.*\/)([^\/]*)$"
-    }
+        $pathValidateRegex = "@^(https?|ftp)://[^\s/$.?#].[^\s]*$@iS"
     
     process {
 
-        if($path -eq $pathValidateRegex){
+        if($path -match $pathValidateRegex -and $path -notmatch ' '){
             Write-Output $resultMessageValid
             $result = $true
         }
@@ -37,6 +36,6 @@ function Check-Branchname() {
     end {
         return $result
     }
-}
 
+}
 Check-Branchname
