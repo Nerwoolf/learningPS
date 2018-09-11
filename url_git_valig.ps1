@@ -24,7 +24,6 @@ function Check-Branchname() {
     }
 =======
         $pathValidateRegex = "@^(https?|ftp)://[^\s/$.?#].[^\s]*$@iS"
->>>>>>> e46a330b1378e102c9a39f16f136060fd8c724b4
     
     process {
 
