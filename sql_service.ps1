@@ -16,13 +16,13 @@
 function new-sqlservice {
     param(
         [Parameter(Mandatory=$true)]
-        [String]$ResGroup,
+        [String]$ResGroup= "Minsk",
 
         [Parameter(Mandatory=$true)]
         [String]$Location,
 
         [Parameter(Mandatory=$true)]
-        [String]$ServerName
+        [String]$ServerName = "nerwoolf-sql"
 
         
 
@@ -35,10 +35,12 @@ process{
     
 
     New-AzureRmSqlServer -ResourceGroupName $ResGroup -Location $Location -ServerName $ServerName -SqlAdministratorCredentials $cred
+
+    New-AzureRmSqlDatabase -DatabaseName ("{0}-db-sql" -f $ResGroup) -ResourceGroupName $ResGroup -ServerName $ServerName -VCore 2 -ComputeGeneration Gen4 -Edition Standard
 }
 end{
 
 }
 }
-new-sqlservice -ResGroup "Minsk" -ServerName "sqltest" -Location "westeurope"
+new-sqlservice -ResGroup "Minsk" -ServerName "nerwoolf-sql" -Location "westeurope"
 

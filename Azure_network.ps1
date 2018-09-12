@@ -21,19 +21,23 @@ begin {
     $cred = Get-Credential -Message "Please input creddentials for vm admin"
     $sharedKeyVnet = '2wsx3edC'
 
-    
-    # Network 1
+    #region Variables network one
     $virtNetPrefix1 = "10.1.0.0/16"
     $vmNetPrefix1 = "10.1.1.0/24"
     $gwPrefix1  = "10.1.2.0/27"
     $vpnClientPool1 = "10.1.3.0/24"
-
-    # Network 2
+    #endregion
+    #region Variables network two
     $virtNetPrefix2 = "10.2.0.0/16"
     $vmNetPrefix2  = "10.2.1.0/24"
     $gwPrefix2 = "10.2.2.0/27"
     $vpnClientPool2 = "10.2.3.0/24"
+    #endregion
 
+    # Setting for IIS
+    $iisSettings = @{
+    "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
+    }
     # VMsize choosing
     $vmSize = 'Standard_A2'
   
@@ -45,11 +49,9 @@ begin {
         Connect-AzureRmAccount
     }
 
-    # Create resource group
+        # Create resource group
         New-AzureRmResourceGroup -Name "moscow" -Location $location
         New-AzureRmResourceGroup -Name "paris"  -Location $location
-
-
 
         # Function to create new storage account
         function new-StorAccount {
@@ -231,7 +233,7 @@ begin {
         }
 
         # This function create VM with network interface and add it to network security group 
-        function  new-azureVM {
+        function  new-azureVMdeploy {
             param (
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
@@ -262,38 +264,84 @@ begin {
             }
         }
         
+        # Use this function to send command in guest OS of your VM
+        function invoke-VMScript {
+            param (
+                [Parameter(Mandatory=$true)]
+                [String[]]$Computername
+
+                
+                
+            )
+        for($i=1; $i -le $VMNumber; $i++){
+            Set-AzureRmVMExtension -ResourceGroup "$resourceGroup" `
+                                   -ExtensionName "IIS" `
+                                   -VMName "$vmName-$i" `
+                                   -Location "$location" `
+                                   -Publisher "Microsoft.Compute" `
+                                   -ExtensionType CustomScriptExtension `
+                                   -asjob `
+                                   -TypeHandlerVersion 1.8 `
+                                   -SettingString ''
+        }
+        }
         
-    }
+        # Add rule to network security group
+         function add-securityRule{
+            [cmdletbinding(DefaultParameterSetName='Destination port')]
+            param (
+                [Parameter(Mandatory=$true, parametersetname = "Destination port")]
+                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
+                [String]$RuleName,
+                
+                [Parameter(Mandatory=$true)]
+                [String]$ResourceGroup,
+
+                [Parameter(Mandatory=$true)]
+                [String]$Location,
+                
+                [Parameter(Mandatory=$false)]
+                [ValidateSet("allow","deny")]
+                [String]$Access="allow",
+                
+                [Parameter(Mandatory=$true, parametersetname = "Destination port")]
+                [ValidateRange(0,65536)]
+                [String]$DstPort,
+
+                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
+                [ValidateRange(0,65536)]
+                [String]$DstStartPort,
+
+                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
+                [ValidateRange(0,65536)]
+                [String]$DstEndPort
+                               
+            )
+            $secRuleVars = @{
+                Protocol = 'Tcp' 
+                Direction = 'Inbound'
+                SourceAddressPrefix = "*"
+                SourcePortRange = "*"
+                DestinationAddressPrefix = "*"
+            }
+            $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $resourcegroup -location $Location -ErrorAction SilentlyContinue
+            if($nsg -ne $null){
+                Add-AzureRmNetworkSecurityRuleConfig -name $RuleName `
+                                                     -access $Action `
+                                                     -DestinationPortRange $DstPort `
+                                                     -NetworkSecurityGroup $nsg 
+            }
+        }
+}
 process {
 
-<<<<<<< HEAD
-    create-StorAccount -ResourceGroup "moscow" -Location $location
-    create-StorAccount -ResourceGroup "paris" -Location $location
-
-    Create-NetSecGroup -ResourceGroup "moscow" -location $location
-    Create-NetSecGroup -ResourceGroup "paris" -location $location
-
-    Create-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
-    Create-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
-
-    Create-VnetGateway -ResourceGroup "moscow" -location $location -IpPrefixGateway $gwPrefix1
-    Create-VnetGateway -ResourceGroup "paris" -location $location -IpPrefixGateway $gwPrefix2
-=======
-    new-StorAccount -ResourceGroup "moscow" -Location $location
     new-StorAccount -ResourceGroup "paris" -Location $location
->>>>>>> e46a330b1378e102c9a39f16f136060fd8c724b4
 
-    new-NetSecGroup -ResourceGroup "moscow" -location $location
     new-NetSecGroup -ResourceGroup "paris" -location $location
 
-    new-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
     new-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
 
-    new-VnetConnection -ResourceGroup "moscow" -location $location -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
-    new-VnetConnection -ResourceGroup "paris" -location $location -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
-
-
-    new-azureVM -ResourceGroup "moscow" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
+    new-azureVM -ResourceGroup "paris" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
 
 }
 end {
