@@ -40,7 +40,7 @@ process{
     }
 
     # Create service plan
-    $webServicePlan = New-AzureRmAppServicePlan -ResourceGroupName $resourceGroup -Location $location -Name "$servicePlanName-01" -NumberofWorkers 2 -WorkerSize small -Tier Standard
+    $webServicePlan = New-AzureRmAppServicePlan -ResourceGroupName $resourceGroup -Location $location -Name "$servicePlanName-01" -NumberofWorkers 2 -WorkerSize small -Tier basic
 
     # Create number (= $webAppNumber) web application 
     for ($i=1; $i -le $webAppNumber; $i++){
