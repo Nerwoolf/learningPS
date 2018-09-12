@@ -21,9 +21,13 @@ begin{
     # Define and initialize variables     
     $webAppName = $resourceGroup+'-web'
     $servicePlanName = $webAppName+"serviceplan"
-    $webAppNumber = 5
-
-
+    $webAppNumber = 1
+    $gitrepo="https://github.com/dotnet-architecture/eShopOnWeb.git"
+    # Configure GitHub deployment to the staging slot from your GitHub repo and deploy once.
+    $PropertiesObject = @{
+    repoUrl = "$gitrepo";
+    branch = "master";
+}
 }
 process{
 
@@ -36,12 +40,20 @@ process{
     }
 
     # Create service plan
-    $webServicePlan = New-AzureRmAppServicePlan -ResourceGroupName $resourceGroup -Location $location -Name "$servicePlanName-01" -NumberofWorkers 2 -WorkerSize small -Tier Basic
+    $webServicePlan = New-AzureRmAppServicePlan -ResourceGroupName $resourceGroup -Location $location -Name "$servicePlanName-01" -NumberofWorkers 2 -WorkerSize small -Tier Standard
 
     # Create number (= $webAppNumber) web application 
     for ($i=1; $i -le $webAppNumber; $i++){
         New-AzureRmWebApp -Name "$webAppName-$i" -ResourceGroupName $resourceGroup -AppServicePlan $webServicePlan.Name
+
+        New-AzureRmWebAppSlot -Name "$webAppName-$i" -ResourceGroupName $resourceGroup -Slot staging
+
+        Set-AzureRmResource -PropertyObject $PropertiesObject -ResourceGroupName $resourceGroup -ResourceType Microsoft.Web/sites/slots/sourcecontrols -ResourceName "$webAppName-$i/staging/web" -ApiVersion 2015-08-01 -Force
+        
     }
+
+    
+
 }
 end{    
 }
