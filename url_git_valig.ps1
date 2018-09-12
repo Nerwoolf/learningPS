@@ -19,6 +19,10 @@ function Check-Branchname() {
         $resultMessageValid = "Path is correct"
         $resultMessageFail = "Path is not correct"
         # Regex pattern for path validating
+<<<<<<< HEAD
+        $pathValidateRegex = "^([\/]?\w*[\/\.\-\_]{0,1}\w*[\/]?)+$"
+    }
+=======
         $pathValidateRegex = "@^(https?|ftp)://[^\s/$.?#].[^\s]*$@iS"
     
     process {

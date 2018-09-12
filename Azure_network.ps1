@@ -169,13 +169,13 @@ begin {
             $virtNet = Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup
             $gwSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet -Name "gatewaysubnet" -ErrorAction SilentlyContinue
                 if($gwSubnet -ne $null){
-                    Wite-host "Gateway subnet already exist"
+                    Write-host "Gateway subnet already exist"
                 }
                 else {
                     $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
                     $virtNet | Set-AzureRmVirtualNetwork
                 }
-                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic
+                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic -Location  $location
                 $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
                 New-AzureRmVirtualNetworkGateway -Name ("{0}-gateway" -f $ResourceGroup)`
                                                  -ResourceGroupName $ResourceGroup `
@@ -266,8 +266,22 @@ begin {
     }
 process {
 
+<<<<<<< HEAD
+    create-StorAccount -ResourceGroup "moscow" -Location $location
+    create-StorAccount -ResourceGroup "paris" -Location $location
+
+    Create-NetSecGroup -ResourceGroup "moscow" -location $location
+    Create-NetSecGroup -ResourceGroup "paris" -location $location
+
+    Create-VMNetwork -ResourceGroup "moscow" -location $location -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    Create-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+
+    Create-VnetGateway -ResourceGroup "moscow" -location $location -IpPrefixGateway $gwPrefix1
+    Create-VnetGateway -ResourceGroup "paris" -location $location -IpPrefixGateway $gwPrefix2
+=======
     new-StorAccount -ResourceGroup "moscow" -Location $location
     new-StorAccount -ResourceGroup "paris" -Location $location
+>>>>>>> e46a330b1378e102c9a39f16f136060fd8c724b4
 
     new-NetSecGroup -ResourceGroup "moscow" -location $location
     new-NetSecGroup -ResourceGroup "paris" -location $location
