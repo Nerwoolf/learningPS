@@ -68,7 +68,7 @@ process{
 }
 end{
 
-    Write-Host ("Copy this text to azure portal for point to site VPN :`n{0}" -f $rootCertValue)
+    Write-Host ("`n`nCopy this text to azure portal for point to site VPN :`n{0}`n`n" -f $rootCertValue)
     if($clientCertCheck -ne $null){
         Write-host ("`n`n`nAt your desktop you will find client certificate for VPN setting up. Certificate name: {0}" -f $ChildCertName)
     }
@@ -77,3 +77,4 @@ end{
     }
 }
 }
+generate-CertForVpn -RootCertName "Azure-VPN" -ChildCertName "Client"  -Password "123qweasd"

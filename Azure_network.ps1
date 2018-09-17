@@ -36,10 +36,10 @@ begin {
 
     # Setting for IIS
     $iisSettings = @{
-    "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
+  #  "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
     }
     # VMsize choosing
-    $vmSize = 'Standard_A2'
+  #  $vmSize = 'Standard_A2'
   
     # Connect to Azure
     try {
@@ -237,10 +237,19 @@ begin {
             param (
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
+
+                [Parameter(Mandatory=$true)]
                 [String]$location,
+
+                [Parameter(Mandatory=$true)]
                 [String]$VMName,
+
+                [Parameter(Mandatory=$true)]
                 [String]$VMSize,
+
                 [String]$AvailabilitySetId,
+
+                [Parameter(Mandatory=$true)]
                 [String]$VMNumber
             )
      
@@ -269,8 +278,6 @@ begin {
             param (
                 [Parameter(Mandatory=$true)]
                 [String[]]$Computername
-
-                
                 
             )
         for($i=1; $i -le $VMNumber; $i++){
@@ -282,39 +289,29 @@ begin {
                                    -ExtensionType CustomScriptExtension `
                                    -asjob `
                                    -TypeHandlerVersion 1.8 `
-                                   -SettingString ''
+                                   -SettingString '"commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"'
+
         }
         }
         
         # Add rule to network security group
          function add-securityRule{
-            [cmdletbinding(DefaultParameterSetName='Destination port')]
             param (
-                [Parameter(Mandatory=$true, parametersetname = "Destination port")]
-                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
-                [String]$RuleName,
+                [Parameter(Mandatory=$true)]
+                [String]$Name,
                 
                 [Parameter(Mandatory=$true)]
-                [String]$ResourceGroup,
-
-                [Parameter(Mandatory=$true)]
-                [String]$Location,
+                [String]$ResourceGroupName,
                 
-                [Parameter(Mandatory=$false)]
+                [Parameter(Mandatory=$true)]
                 [ValidateSet("allow","deny")]
-                [String]$Access="allow",
+                [String]$Access,
                 
-                [Parameter(Mandatory=$true, parametersetname = "Destination port")]
-                [ValidateRange(0,65536)]
-                [String]$DstPort,
+                [Parameter(Mandatory=$true)]
+                [String]$DestinationPortRange,
 
-                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
-                [ValidateRange(0,65536)]
-                [String]$DstStartPort,
-
-                [Parameter(Mandatory=$true, parametersetname = "Destination port range")]
-                [ValidateRange(0,65536)]
-                [String]$DstEndPort
+                [Parameter(Mandatory=$true)]
+                [int]$Priority
                                
             )
             $secRuleVars = @{
@@ -324,26 +321,21 @@ begin {
                 SourcePortRange = "*"
                 DestinationAddressPrefix = "*"
             }
-            $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $resourcegroup -location $Location -ErrorAction SilentlyContinue
+            $PSBoundParameters.remove("ResourceGroupName") | out-null
+           $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
             if($nsg -ne $null){
-                Add-AzureRmNetworkSecurityRuleConfig -name $RuleName `
-                                                     -access $Action `
-                                                     -DestinationPortRange $DstPort `
-                                                     -NetworkSecurityGroup $nsg 
+                Add-AzureRmNetworkSecurityRuleConfig -NetworkSecurityGroup $nsg @PSBoundParameters @secRuleVars 
+                Set-AzureRmNetworkSecurityGroup -NetworkSecurityGroup $nsg
+            }
+            else {
+                Write-host ("Security group doesn't exist in {0} resource group" -f $ResourceGroupName)
             }
         }
 }
-process {
+process {            
 
-    new-StorAccount -ResourceGroup "paris" -Location $location
-
-    new-NetSecGroup -ResourceGroup "paris" -location $location
-
-    new-VMNetwork -ResourceGroup "paris" -location $location -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
-
-    new-azureVM -ResourceGroup "paris" -location $location -VMName "test" -VMSize $vmSize -VMNumber 2                  
 
 }
 end {
-    
+
 }
