@@ -32,6 +32,7 @@ begin {
     $vmNetPrefix2  = "10.2.1.0/24"
     $gwPrefix2 = "10.2.2.0/27"
     $vpnClientPool2 = "10.2.3.0/24"
+    $vmSize = 'Standard_A2'
     #endregion
 
     # Setting for IIS
@@ -39,7 +40,7 @@ begin {
   #  "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
     }
     # VMsize choosing
-  #  $vmSize = 'Standard_A2'
+  #  
   
     # Connect to Azure
     try {
