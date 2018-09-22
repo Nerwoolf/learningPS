@@ -77,4 +77,4 @@ end{
     }
 }
 }
-generate-CertForVpn -RootCertName "Azure-VPN" -ChildCertName "Client"  -Password "123qweasd"
+generate-CertForVpn -RootCertName "webapp" -ChildCertName "Client-cert"  -Password "123qweasd"

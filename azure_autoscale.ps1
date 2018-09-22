@@ -49,21 +49,21 @@ begin{
 process{
     $vmScaleSet = new-azurermvmss @vmSsSettings
     Add-AzureRmVmssExtension -VirtualMachineScaleSet $vmScaleSet `
-                            -Name "customScript" `
-                            -Publisher "Microsoft.Compute" `
-                            -Type "CustomScriptExtension" `
-                            -TypeHandlerVersion 1.8 `
-                            -Setting $pubSettings
+                             -Name "customScript" `
+                             -Publisher "Microsoft.Compute" `
+                             -Type "CustomScriptExtension" `
+                             -TypeHandlerVersion 1.8 `
+                             -Setting $pubSettings
     Update-AzureRmVmss -ResourceGroupName $ResourseGroupName -VirtualMachineScaleSet $vmScaleSet
     $autoScaleRule = New-AzureRmAutoscaleRule -MetricName "Percentage CPU" `
-                                             -MetricResourceId $vmScaleSet.Id `
-                                             -Operator GreaterThanOrEqual `
-                                             -MetricStatistic Average `
-                                             -Threshold 85 `
-                                             -TimeGrain 00:01:00 `
-                                             -ScaleActionCooldown 00:10:00 `
-                                             -ScaleActionDirection Increase `
-                                             -ScaleActionValue 2
+                                              -MetricResourceId $vmScaleSet.Id `
+                                              -Operator GreaterThanOrEqual `
+                                              -MetricStatistic Average `
+                                              -Threshold 85 `
+                                              -TimeGrain 00:01:00 `
+                                              -ScaleActionCooldown 00:10:00 `
+                                              -ScaleActionDirection Increase `
+                                              -ScaleActionValue 2
     $VssProfile = New-AzureRmAutoscaleProfile -Name "$ResourseGroupName-autoscale" -DefaultCapacity 1 -MaximumCapacity 3 -MinimumCapacity 1 -Rule $autoScaleRule
     Add-AzureRmAutoscaleSetting -Location $Location -ResourceGroupName $ResourseGroupName -TargetResourceId $vmScaleSet.Id -AutoscaleProfile $VssProfile -Name "autoscale"
 }
