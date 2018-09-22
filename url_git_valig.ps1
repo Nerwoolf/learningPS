@@ -7,39 +7,26 @@
     PS C:\> url_git_valid.ps1 -branchname refs/heads/FB/11.1/DBAUtil_Changes
 #>
 
-function Check-Branchname() {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)]
-        [String]$path
-    )
-    
-    begin {
-
-        $resultMessageValid = "Path is correct"
-        $resultMessageFail = "Path is not correct"
-        # Regex pattern for path validating
-<<<<<<< HEAD
-        $pathValidateRegex = "^([\/]?\w*[\/\.\-\_]{0,1}\w*[\/]?)+$"
-    }
-=======
-        $pathValidateRegex = "@^(https?|ftp)://[^\s/$.?#].[^\s]*$@iS"
-    
-    process {
-
-        if($path -match $pathValidateRegex -and $path -notmatch ' '){
-            Write-Output $resultMessageValid
-            $result = $true
-        }
-        else {
-            Write-Output $resultMessageFail
-            $result = $false
-        }
-    }
-    
-    end {
-        return $result
-    }
-
+$reg = "^/?(\w+[-._/]?){1,}(\w+[-._/]?){0,1}$"
+function check-branchname {
+param(
+[parameter(Mandatory=$true)]
+[String]$BranchUrl
+)  
+$BranchUrl = $BranchUrl.Trim('')
+$Error.Clear()
+if($BranchUrl.Contains(' ')){
+Write-error "Contain spaces" -ErrorAction Stop
 }
-Check-Branchname
+try{
+if($BranchUrl -match $reg){
+   return $true
+}
+else{
+    return $false
+}
+}
+catch{
+    return $Error
+}
+}
