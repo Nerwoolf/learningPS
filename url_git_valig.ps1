@@ -7,7 +7,7 @@
     PS C:\> url_git_valid.ps1 -branchname refs/heads/FB/11.1/DBAUtil_Changes
 #>
 
-$reg = "^/?(\w+[-._/]?){1,}(\w+[-._/]?){0,1}$"
+$reg = "^[\/]?(\w+[-._\/]?){1,}(\w+[-._\/]?){0,1}$"
 function check-branchname {
 param(
 [parameter(Mandatory=$true)]
@@ -15,9 +15,9 @@ param(
 )  
 $BranchUrl = $BranchUrl.Trim('')
 $Error.Clear()
-if($BranchUrl.Contains(' ')){
+<#if($BranchUrl.Contains(' ')){
 Write-error "Contain spaces" -ErrorAction Stop
-}
+}#>
 try{
 if($BranchUrl -match $reg){
    return $true
