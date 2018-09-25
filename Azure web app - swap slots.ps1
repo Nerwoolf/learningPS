@@ -2,12 +2,11 @@ $resourceGroup = $AzureResourceGroupName
 $slotName = $AzureSlotName
 $webAppName = $AzureWebAppName
 $siteUrl = $url
-$TimeLog = @()
 # for local testing
-# $resourceGroup = "nerwoolf-web"
-# $slotName = "deploymentslot"
-# $webAppName = "nerwoolf-webapp"
-# $siteUrl = "http://nerwoolf-webapp.azurewebsites.net"
+$resourceGroup = "nerwoolf-webapp"
+$slotName = "deploymentslot2"
+$webAppName = "nerwoolf-webapp"
+$siteUrl = "http://nerwoolf-webapp.azurewebsites.net"
 Write-Host ("Start azure web app deployment slot swap.")
 Write-Host (" -slot name = {0}`n -web app = {1}`n -site url = {2}`n`n" -f $slotName, $webAppName, $siteUrl)
 
@@ -21,29 +20,26 @@ Function Site-WakeUp {
 
     If (![string]::IsNullOrWhiteSpace($TestUrl)) {
         Write-Output "INFO: Making request to $TestUrl"
-        
         Try {
             $stopwatch = [Diagnostics.Stopwatch]::StartNew()
             # Allow redirections on the warm up
             $response = Invoke-WebRequest -UseBasicParsing $TestUrl -MaximumRedirection 10
             $stopwatch.Stop()
             $statusCode = [int]$response.StatusCode
-            $TimeLog+= Write-Output "INFO: $statusCode Warmed Up Site $TestUrl in $($stopwatch.Elapsed.Seconds)s"
+            Write-Output "INFO: $statusCode Warmed Up Site $TestUrl in $($stopwatch.ElapsedMilliseconds)s ms"
         } catch {
            ($_.Exception).Message
         }
-        
-         For ($i = 0; $i -lt $MaxAttempts; $i++) {
+       
+         For ($i = 1; $i -le $MaxAttempts; $i++) {
             try {
-                Write-Output "INFO: Checking Site...$i"
+                Write-Output "INFO: Checking Site attempt: $i"
                 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
                 # Don't allow redirections on the check
                 $response = Invoke-WebRequest -UseBasicParsing $TestUrl -MaximumRedirection 1
-                $stopwatch.Stop()
-                
                 $statusCode = [int]$response.StatusCode
                 
-                $TimeLog+=Write-Output "INFO: $statusCode Second request took $($stopwatch.Elapsed.Seconds)s"
+                Write-Output "INFO: $statusCode Second request took $($stopwatch.Elapsed.Seconds)s"
                 
                 If ($statusCode -ge 200 -And $statusCode -lt 400) {
                     $status = 'OK'
@@ -74,40 +70,54 @@ Function Site-WakeUp {
     return $status
 }
 
+#region CheckDeploySlot and create if not exist
 Write-Host ("Get azure web app deployment slot.") 
 $webAppSlot = Get-AzureRmWebAppSlot -ResourceGroupName $resourceGroup -Name $webAppName -Slot $slotName -ErrorAction SilentlyContinue
-$webApp = Get-AzureRmWebApp -ResourceGroupName $resourceGroup -Name $webAppName
+$webApp = Get-AzureRmWebApp -ResourceGroupName $resourceGroup -Name $webAppName -ErrorAction SilentlyContinue
 if ($webApp) {
     write-host ("Web app exist.")
 } else {
     throw "Web app does not exist. Please create and configure web app on portal.azure.com and restart deployment."
     exit 0
 }
-
+# slot creating
 if ($webAppSlot) {
     Write-Host ("Deployment slot exist.")
 }
 else {
     Write-Host ("Slot does not exit, create new.")
-    $webAppSlot = New-AzureRmWebAppSlot -ResourceGroupName $resourceGroup -Name $webAppName -Slot $slotName
-    if ($webAppSlot) {
-        Write-Host ("Slot has been created.")
-    } else {
-        throw "Unable to create deplyoment slot."
+    try{
+    $webAppSlot = New-AzureRmWebAppSlot -ResourceGroupName $resourceGroup -Name $webAppName -Slot $slotName -ErrorAction Stop
+        if ($webAppSlot) {
+            Write-Host ("Slot has been created.")
+        else {
+                throw "Unable to create deplyoment slot."
+        }
+        }
+    }    
+    catch{
+      write-host -NoNewline -ForegroundColor red "`nFailed during creating slot:" 
+      write-host (" {0}" -f ($_.exception).Message )
+      Write-host -ForegroundColor red  "Swap failed"
+      exit
     }
 }
+#endregion CheckDeploySlot and create if not exist
+
+#region SwapSlot
 Write-Host ("Start swap procedure.")
 
 if ($webAppSlot.State -eq 'Running') {
     $state = "Running"
 } else {
     $start = $webAppSlot | Start-AzureRmWebAppSlot
-    Write-host ("Slot is stopped, can't. Start slot for deployment")
+    Write-host ("Slot is stopped. Start slot for deployment")
     $state = "Stopped"
 }
 
 Write-host ("`n{0}`nStart site warm up." -f ("="*100))
 
+# warm-up site
 Site-WakeUp -TestUrl $siteUrl -Verbose
 
 Write-Output ("`n`n`nWarm up is done. `n{0}" -f ("="*100))
@@ -118,13 +128,12 @@ switch ($state) {
     Stopped { 
         Write-Output ("Stop deployment slot (becasue it was stopped)")
         $stopSlot = $webAppSlot | Stop-AzureRmWebAppSlot
-        $te += Logs ("stop deployment slot (becasue it was stopped)")
         }
     Default {
-        Write-Output ("Start deployment slot (becasue it was running)")
+        Write-Output "Start deployment slot (becasue it was running)"
         $startSlot = $webAppSlot | Start-AzureRmWebAppSlot
-        $te += Logs ("start deployment slot (becasue it was running)")
     }
 }
+#endregion SwapSlot
 
 Write-Host ("Script has been executed.")
