@@ -1,8 +1,3 @@
-try {
-    Stop-Process -Name assda 
-}
-catch {
-}
-finally {
-    
-}
+$site = "https://dodopizza.by/minsk"
+$request = Invoke-WebRequest -Uri $site
+$request | gm

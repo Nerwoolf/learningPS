@@ -3,10 +3,10 @@ $slotName = $AzureSlotName
 $webAppName = $AzureWebAppName
 $siteUrl = $url
 # for local testing
-$resourceGroup = "nerwoolf-webapp"
-$slotName = "deploymentslot2"
-$webAppName = "nerwoolf-webapp"
-$siteUrl = "http://nerwoolf-webapp.azurewebsites.net"
+# $resourceGroup = "nerwoolf-webapp"
+# $slotName = "deploymentslot2"
+# $webAppName = "nerwoolf-webapp"
+# $siteUrl = "http://nerwoolf-webapp.azurewebsites.net"
 Write-Host ("Start azure web app deployment slot swap.")
 Write-Host (" -slot name = {0}`n -web app = {1}`n -site url = {2}`n`n" -f $slotName, $webAppName, $siteUrl)
 
