@@ -11,27 +11,32 @@ begin {
     $sharedKeyVnet = '2wsx3edC'
     $vmsize = "Standard_A2"
     #region Variables network one
+
+    $rgEurope = "crgfr"
+    $LocEurope = "westeurope"
     $virtNetPrefix1 = "10.1.0.0/16"
     $vmNetPrefix1 = "10.1.1.0/24"
     $gwPrefix1  = "10.1.2.0/27"
     $vpnClientPool1 = "10.1.3.0/24"
     #endregion
+
     #region Variables network two
+
+    $rgFrance = "crgkr"
+    $LocFrance = "francecentral"
     $virtNetPrefix2 = "10.2.0.0/16"
     $vmNetPrefix2  = "10.2.1.0/24"
     $gwPrefix2 = "10.2.2.0/27"
     $vpnClientPool2 = "10.2.3.0/24"
-    $vmSize = 'Standard_A2'
     #endregion
 
     # Setting for IIS
-    $iisSettings = @{
+    #  $iisSettings = @{
   #  "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
-    }
 
     # Check azure module
-    $AzureRMmodule = Get-InstalledModule "azurerm*"
-    if($AzureRMmodule){
+    $ModuleCheck = Get-InstalledModule "azurerm*"
+    if($ModuleCheck){
         Write-host "Module has already installed"
     } else{
         try {
@@ -49,12 +54,15 @@ begin {
     # Connect to Azure
     try {
         Get-AzureRmSubscription
+        read-host "Press Enter if you want to continue, or crt+C to exit"
     }
     catch {
         Write-host "Please login to your account"
         Connect-AzureRmAccount
     }
 
+            New-AzureRmResourceGroup -Name $rgEurope -Location $LocEurope
+            New-AzureRmResourceGroup -Name $rgFrance -Location $LocFrance
         # Function to create new storage account
         function new-StorAccount {
             param(
@@ -159,6 +167,7 @@ begin {
             [Parameter(Mandatory=$true)]
             [String]$location,
 
+            [Parameter(Mandatory=$true)]
             [String]$IpPrefixGateway
             )
             $GwName = ("{0}-gateway" -f $ResourceGroup)
@@ -178,6 +187,7 @@ begin {
                 else {
                     $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
                     $virtNet | Set-AzureRmVirtualNetwork
+                    $gwSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet -Name "gatewaysubnet"
                 }
                 $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic -Location  $location
                 $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
@@ -186,9 +196,9 @@ begin {
                                                  -Location $location `
                                                  -IpConfigurations $gwConfig `
                                                  -GatewayType Vpn `
-                                                 -VpnType  `
-                                                 -GatewaySku VpnGw1 `
-                                                 -AsJob
+                                                 -VpnType RouteBased `
+                                                 -GatewaySku VpnGw1
+
             }
             
         }
@@ -256,24 +266,16 @@ begin {
                 [String]$VMNumber
             )
      
-            for($i=1; $i -le $VMNumber; $i++){
+           
                 $nic = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup `
                                                    -Location $location `
-                                                   -Name ("{0}-nic-{1}" -f $VMName, $i) `
+                                                   -Name ("{0}-nic-1" -f $VMName) `
                                                    -Subnet  ((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets| Where-Object -Property name -eq ("{0}-vm-subnet" -f $ResourceGroup))
-
-                $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -VMSize $vmSize 
-
-                $vmConfig | Set-AzureRmVMBootDiagnostics -ResourceGroupName $resourceGroup -Enable -StorageAccountName (Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroup).StorageAccountName
-
-                $vmConfig | Set-AzureRmVMOperatingSystem -Windows -ComputerName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -Credential $cred
-
+                $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-01" -f $ResourceGroup, $VMName) -VMSize $vmSize 
                 $vmConfig |  Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2016-Datacenter -Version latest
-                
                 $vmConfig | Add-AzureRmVMNetworkInterface -Id $nic.id
                 
-                New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig
-            }
+                New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig -Credential $cred
         }
         # Pause function
         function make-pause {
@@ -288,7 +290,7 @@ begin {
                 Start-Sleep -Seconds 1
             }
         }
-
+        <#
         # Use this function to send command in guest OS of your VM
         function invoke-VMScript {
             param (
@@ -308,7 +310,7 @@ begin {
                                    -SettingString '"commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"'
 
         }
-        }
+        }#>
         
         # Add rule to network security group
          function add-securityRule{
@@ -349,29 +351,18 @@ begin {
         }
 }
 process {
-    $rgEurope = "westeurope"
-    $rgFrance = "francecentral"
-    
-    $LocEurope = "westeurope"
-    $LocFrance = "francecentral"
-    
-    New-AzureRmResourceGroup -Name $rgEurope -Location $rgEurope
-    New-AzureRmResourceGroup -Name $rgFrance -Location $LocFrance
 
-    new-StorAccount -ResourceGroup $rgEurope -Location $LocEurope
-    new-StorAccount -ResourceGroup $rgFrance -Location $LocFrance
-    
     new-NetSecGroup -ResourceGroup $rgEurope -location $LocEurope
     new-NetSecGroup -ResourceGroup $rgFrance -location $LocFrance
 
     new-VMNetwork -ResourceGroup $rgEurope -location $LocEurope -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
     new-VMNetwork -ResourceGroup $rgFrance -location $LocFrance -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
     
-    new-azureVMdeploy -ResourceGroup $rgEurope -location $LocEurope -VMName "vm" -VMNumber 1 -VMSize $vmSize
-    new-azureVMdeploy -ResourceGroup $rgFrance -location $LocFrance -VMName "vm" -VMNumber 1 -VMSize $vmSize
+    new-azureVMdeploy -ResourceGroup $rgEurope -location $LocEurope -VMName "vm" -VMNumber "1" -VMSize $vmSize
+    new-azureVMdeploy -ResourceGroup $rgFrance -location $LocFrance -VMName "vm" -VMNumber "1" -VMSize $vmSize
 
-    new-VnetGateway -ResourceGroup $rgEurope -location $LocEurope
-    new-VnetGateway -ResourceGroup $rgFrance -location $LocFrance
+    new-VnetGateway -ResourceGroup $rgEurope -location $LocEurope -IpPrefixGateway $gwPrefix1
+    new-VnetGateway -ResourceGroup $rgFrance -location $LocFrance -IpPrefixGateway $gwPrefix2
     
     make-pause -TimeMinutes 55
 
