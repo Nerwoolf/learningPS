@@ -9,7 +9,7 @@ begin {
     # VM admin credentials
     $cred = Get-Credential -Message "Please input creddentials for vm admin"
     $sharedKeyVnet = '2wsx3edC'
-
+    $vmsize = "Standard_A2"
     #region Variables network one
     $virtNetPrefix1 = "10.1.0.0/16"
     $vmNetPrefix1 = "10.1.1.0/24"
@@ -54,10 +54,6 @@ begin {
         Write-host "Please login to your account"
         Connect-AzureRmAccount
     }
-
-        # Create resource group
-        New-AzureRmResourceGroup -Name "moscow" -Location $location
-        New-AzureRmResourceGroup -Name "paris"  -Location $location
 
         # Function to create new storage account
         function new-StorAccount {
@@ -190,8 +186,9 @@ begin {
                                                  -Location $location `
                                                  -IpConfigurations $gwConfig `
                                                  -GatewayType Vpn `
-                                                 -VpnType RouteBased `
-                                                 -GatewaySku VpnGw1
+                                                 -VpnType  `
+                                                 -GatewaySku VpnGw1 `
+                                                 -AsJob
             }
             
         }
@@ -278,7 +275,20 @@ begin {
                 New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig
             }
         }
+        # Pause function
+        function make-pause {
+            param (
+                [Parameter(Mandatory=$true)]
+                [int]$TimeMinutes = "1"
+            )
+            Write-host -ForegroundColor Green "Start sleep for $TimeMinutes minutes"
+            
+            for($i=$TimeMinutes*60; $i -ge 0; $i--){
         
+                Start-Sleep -Seconds 1
+            }
+        }
+
         # Use this function to send command in guest OS of your VM
         function invoke-VMScript {
             param (
@@ -338,9 +348,47 @@ begin {
             }
         }
 }
-process {            
+process {
+    $rgEurope = "westeurope"
+    $rgFrance = "francecentral"
+    
+    $LocEurope = "westeurope"
+    $LocFrance = "francecentral"
+    
+    New-AzureRmResourceGroup -Name $rgEurope -Location $rgEurope
+    New-AzureRmResourceGroup -Name $rgFrance -Location $LocFrance
+
+    new-StorAccount -ResourceGroup $rgEurope -Location $LocEurope
+    new-StorAccount -ResourceGroup $rgFrance -Location $LocFrance
+    
+    new-NetSecGroup -ResourceGroup $rgEurope -location $LocEurope
+    new-NetSecGroup -ResourceGroup $rgFrance -location $LocFrance
+
+    new-VMNetwork -ResourceGroup $rgEurope -location $LocEurope -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    new-VMNetwork -ResourceGroup $rgFrance -location $LocFrance -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+    
+    new-azureVMdeploy -ResourceGroup $rgEurope -location $LocEurope -VMName "vm" -VMNumber 1 -VMSize $vmSize
+    new-azureVMdeploy -ResourceGroup $rgFrance -location $LocFrance -VMName "vm" -VMNumber 1 -VMSize $vmSize
+
+    new-VnetGateway -ResourceGroup $rgEurope -location $LocEurope
+    new-VnetGateway -ResourceGroup $rgFrance -location $LocFrance
+    
+    make-pause -TimeMinutes 55
+
+    new-VnetConnection -ResourceGroup $rgEurope `
+                       -location $LocEurope `
+                       -ConnectionDSTResGroup $rgFrance `
+                       -SharedKey $sharedKeyVnet `
+                       -ConnectionType vnet2vnet
+
+    new-VnetConnection -ResourceGroup $rgFrance `
+                       -location $LocFrance `
+                       -ConnectionDSTResGroup $rgEurope `
+                       -SharedKey $sharedKeyVnet `
+                       -ConnectionType vnet2vnet
+        
+        
  
-    new-VnetGateway -ResourceGroup sf
 }
 end {
 
