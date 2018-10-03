@@ -2,19 +2,8 @@
 .SYNOPSIS
     azure_network.ps1
 .DESCRIPTION
-    Long description
-.EXAMPLE
-    PS C:\> <example usage>
-    Explanation of what the example does
+    Deploy 2 VM in different resource group and setting up vnet to vnet connection between them
 #>
-param(
-   # [Parameter(Mandatory = $true)]
-   # [String]$ResourceGroup1='paris',
-
-    [Parameter(Mandatory = $true)]
-    [String]$location='WestEurope'
-       
-)
 begin {
 
     # VM admin credentials
@@ -39,14 +28,30 @@ begin {
     $iisSettings = @{
   #  "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
     }
-    # VMsize choosing
-  #  
-  
+
+    # Check azure module
+    $AzureRMmodule = Get-InstalledModule "azurerm*"
+    if($AzureRMmodule){
+        Write-host "Module has already installed"
+    } else{
+        try {
+            Write-host "Installing AzureRM module"
+            Install-Module azurerm
+        }
+            catch{
+                $Error.Clear()
+                Write-host "Check your admin permission for powershell session"
+                Write-host "Installation failed with error: " -NoNewline
+                Write-Host -BackgroundColor red -Object $Error.exception.Message
+                      
+            }
+        }
     # Connect to Azure
     try {
         Get-AzureRmSubscription
     }
     catch {
+        Write-host "Please login to your account"
         Connect-AzureRmAccount
     }
 
@@ -334,8 +339,8 @@ begin {
         }
 }
 process {            
-
-
+ 
+    new-VnetGateway -ResourceGroup sf
 }
 end {
 
