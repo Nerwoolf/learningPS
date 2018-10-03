@@ -2,69 +2,49 @@
 .SYNOPSIS
     azure_network.ps1
 .DESCRIPTION
-    Deploy 2 VM in different resource group and setting up vnet to vnet connection between them
+    Long description
+.EXAMPLE
+    PS C:\> <example usage>
+    Explanation of what the example does
 #>
 begin {
-
+    
     # VM admin credentials
     $cred = Get-Credential -Message "Please input creddentials for vm admin"
-    $sharedKeyVnet = '2wsx3edC'
-    $vmsize = "Standard_A2"
-    #region Variables network one
+    $sharedKeyVnet = 'Test123'
 
-    $rgEurope = "crgfr"
-    $LocEurope = "westeurope"
+    
+    # Network 1
     $virtNetPrefix1 = "10.1.0.0/16"
     $vmNetPrefix1 = "10.1.1.0/24"
     $gwPrefix1  = "10.1.2.0/27"
     $vpnClientPool1 = "10.1.3.0/24"
-    #endregion
 
-    #region Variables network two
-
-    $rgFrance = "crgkr"
-    $LocFrance = "francecentral"
+    # Network 2
     $virtNetPrefix2 = "10.2.0.0/16"
     $vmNetPrefix2  = "10.2.1.0/24"
     $gwPrefix2 = "10.2.2.0/27"
     $vpnClientPool2 = "10.2.3.0/24"
-    #endregion
 
-    # Setting for IIS
-    #  $iisSettings = @{
-  #  "commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"
-
-    # Check azure module
-    $ModuleCheck = Get-InstalledModule "azurerm*"
-    if($ModuleCheck){
-        Write-host "Module has already installed"
-    } else{
-        try {
-            Write-host "Installing AzureRM module"
-            Install-Module azurerm
-        }
-            catch{
-                $Error.Clear()
-                Write-host "Check your admin permission for powershell session"
-                Write-host "Installation failed with error: " -NoNewline
-                Write-Host -BackgroundColor red -Object $Error.exception.Message
-                      
-            }
-        }
+    # VMsize choosing
+    $vmSize = 'Standard_A2'
+  
     # Connect to Azure
     try {
         Get-AzureRmSubscription
-        read-host "Press Enter if you want to continue, or crt+C to exit"
     }
     catch {
-        Write-host "Please login to your account"
         Connect-AzureRmAccount
     }
 
-            New-AzureRmResourceGroup -Name $rgEurope -Location $LocEurope
-            New-AzureRmResourceGroup -Name $rgFrance -Location $LocFrance
-        # Function to create new storage account
-        function new-StorAccount {
+    # Create resource group
+        New-AzureRmResourceGroup -Name "moscow" -Location "westeurope"
+        New-AzureRmResourceGroup -Name "paris"  -Location "northeurope"
+
+
+
+        # Create new storage account
+        function Create-StorAccount {
             param(
                
                 [Parameter(Mandatory = $true)]
@@ -85,12 +65,10 @@ begin {
                                                  -SkuName Standard_GRS `
                                                  -Kind StorageV2 
             }
-        } 
-
-        # This function creating security group                                     
-        function new-NetSecGroup {
+        }                                      
+        function Create-NetSecGroup {
             param(
-
+                
             [Parameter(Mandatory=$true)]
             [String]$ResourceGroup,
 
@@ -122,9 +100,8 @@ begin {
             }
             
         }
+        function Create-VMNetwork {
 
-        # Function to create virtual network
-        function new-VMNetwork {
             param (
 
             [Parameter(Mandatory=$true)]
@@ -156,9 +133,7 @@ begin {
             }
             
         }
-        
-        # Function to create virtual network Gateway
-        function new-VnetGateway {
+        function Create-VnetGateway {
             param (
                 
             [Parameter(Mandatory=$true)]
@@ -167,7 +142,6 @@ begin {
             [Parameter(Mandatory=$true)]
             [String]$location,
 
-            [Parameter(Mandatory=$true)]
             [String]$IpPrefixGateway
             )
             $GwName = ("{0}-gateway" -f $ResourceGroup)
@@ -187,9 +161,8 @@ begin {
                 else {
                     $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
                     $virtNet | Set-AzureRmVirtualNetwork
-                    $gwSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $virtNet -Name "gatewaysubnet"
                 }
-                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -AllocationMethod Dynamic -Location  $location
+                $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -location $location -AllocationMethod Dynamic
                 $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
                 New-AzureRmVirtualNetworkGateway -Name ("{0}-gateway" -f $ResourceGroup)`
                                                  -ResourceGroupName $ResourceGroup `
@@ -198,13 +171,11 @@ begin {
                                                  -GatewayType Vpn `
                                                  -VpnType RouteBased `
                                                  -GatewaySku VpnGw1
-
             }
             
         }
-
-        # Function add Vnet connection to gateway 
-        function new-VnetConnection {
+          # Function add Vnet connection to gateway 
+          function new-VnetConnection {
             param(
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
@@ -244,143 +215,61 @@ begin {
             
             }
         }
-
-        # This function create VM with network interface and add it to network security group 
-        function  new-azureVMdeploy {
+        function  Create-NewVM {
             param (
                 [Parameter(Mandatory=$true)]
                 [String]$ResourceGroup,
-
-                [Parameter(Mandatory=$true)]
                 [String]$location,
-
-                [Parameter(Mandatory=$true)]
                 [String]$VMName,
-
-                [Parameter(Mandatory=$true)]
                 [String]$VMSize,
-
                 [String]$AvailabilitySetId,
-
-                [Parameter(Mandatory=$true)]
                 [String]$VMNumber
             )
      
-           
+            for($i=1; $i -le $VMNumber; $i++){
                 $nic = New-AzureRmNetworkInterface -ResourceGroup $resourceGroup `
                                                    -Location $location `
-                                                   -Name ("{0}-nic-1" -f $VMName) `
+                                                   -Name ("{0}-nic-{1}" -f $VMName, $i) `
                                                    -Subnet  ((Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets| Where-Object -Property name -eq ("{0}-vm-subnet" -f $ResourceGroup))
-                $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-01" -f $ResourceGroup, $VMName) -VMSize $vmSize 
+
+                $vmConfig = New-AzureRmVMConfig -VMName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -VMSize $vmSize 
+
+                $vmConfig | Set-AzureRmVMBootDiagnostics -ResourceGroupName $resourceGroup -Enable -StorageAccountName (Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroup).StorageAccountName
+
+                $vmConfig | Set-AzureRmVMOperatingSystem -Windows -ComputerName ("{0}-{1}-0{2}" -f $ResourceGroup, $VMName, $i) -Credential $cred
+
                 $vmConfig |  Set-AzureRmVMSourceImage -PublisherName MicrosoftWindowsServer -Offer WindowsServer -Skus 2016-Datacenter -Version latest
+                
                 $vmConfig | Add-AzureRmVMNetworkInterface -Id $nic.id
-                
-                New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig -Credential $cred
-        }
-        # Pause function
-        function make-pause {
-            param (
-                [Parameter(Mandatory=$true)]
-                [int]$TimeMinutes = "1"
-            )
-            Write-host -ForegroundColor Green "Start sleep for $TimeMinutes minutes"
-            
-            for($i=$TimeMinutes*60; $i -ge 0; $i--){
         
-                Start-Sleep -Seconds 1
+                New-AzureRmVM -ResourceGroup $resourceGroup -Location $location -VM $vmConfig
             }
         }
-        <#
-        # Use this function to send command in guest OS of your VM
-        function invoke-VMScript {
-            param (
-                [Parameter(Mandatory=$true)]
-                [String[]]$Computername
-                
-            )
-        for($i=1; $i -le $VMNumber; $i++){
-            Set-AzureRmVMExtension -ResourceGroup "$resourceGroup" `
-                                   -ExtensionName "IIS" `
-                                   -VMName "$vmName-$i" `
-                                   -Location "$location" `
-                                   -Publisher "Microsoft.Compute" `
-                                   -ExtensionType CustomScriptExtension `
-                                   -asjob `
-                                   -TypeHandlerVersion 1.8 `
-                                   -SettingString '"commandToExecute"="powershell Add-WindowsFeature Web-Server; powershell Add-Content -Path \"C:\\inetpub\\wwwroot\\Default.htm\" -Value $($env:computername)"'
-
-        }
-        }#>
         
-        # Add rule to network security group
-         function add-securityRule{
-            param (
-                [Parameter(Mandatory=$true)]
-                [String]$Name,
-                
-                [Parameter(Mandatory=$true)]
-                [String]$ResourceGroupName,
-                
-                [Parameter(Mandatory=$true)]
-                [ValidateSet("allow","deny")]
-                [String]$Access,
-                
-                [Parameter(Mandatory=$true)]
-                [String]$DestinationPortRange,
-
-                [Parameter(Mandatory=$true)]
-                [int]$Priority
-                               
-            )
-            $secRuleVars = @{
-                Protocol = 'Tcp' 
-                Direction = 'Inbound'
-                SourceAddressPrefix = "*"
-                SourcePortRange = "*"
-                DestinationAddressPrefix = "*"
-            }
-            $PSBoundParameters.remove("ResourceGroupName") | out-null
-           $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
-            if($nsg -ne $null){
-                Add-AzureRmNetworkSecurityRuleConfig -NetworkSecurityGroup $nsg @PSBoundParameters @secRuleVars 
-                Set-AzureRmNetworkSecurityGroup -NetworkSecurityGroup $nsg
-            }
-            else {
-                Write-host ("Security group doesn't exist in {0} resource group" -f $ResourceGroupName)
-            }
-        }
-}
+    }
 process {
 
-    new-NetSecGroup -ResourceGroup $rgEurope -location $LocEurope
-    new-NetSecGroup -ResourceGroup $rgFrance -location $LocFrance
+    create-StorAccount -ResourceGroup "moscow" -Location "westeurope"
+    create-StorAccount -ResourceGroup "paris" -Location "northeurope"
 
-    new-VMNetwork -ResourceGroup $rgEurope -location $LocEurope -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
-    new-VMNetwork -ResourceGroup $rgFrance -location $LocFrance -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+    Create-NetSecGroup -ResourceGroup "moscow" -location "westeurope"
+    Create-NetSecGroup -ResourceGroup "paris" -location "northeurope"
+
+    Create-VMNetwork -ResourceGroup "moscow" -location "westeurope" -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    Create-VMNetwork -ResourceGroup "paris" -location "northeurope" -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+
+  #   Create-newVM -ResourceGroup "moscow" -location "westeurope" -VMName "web1" -$VMNumber 1
+  #  Create-newVM -ResourceGroup "paris" -location "northeurope" -VMName "web1" -$VMNumber 1
     
-    new-azureVMdeploy -ResourceGroup $rgEurope -location $LocEurope -VMName "vm" -VMNumber "1" -VMSize $vmSize
-    new-azureVMdeploy -ResourceGroup $rgFrance -location $LocFrance -VMName "vm" -VMNumber "1" -VMSize $vmSize
 
-    new-VnetGateway -ResourceGroup $rgEurope -location $LocEurope -IpPrefixGateway $gwPrefix1
-    new-VnetGateway -ResourceGroup $rgFrance -location $LocFrance -IpPrefixGateway $gwPrefix2
+    Create-VnetGateway -ResourceGroup "moscow" -location "westeurope" -IpPrefixGateway  $gwPrefix1
+    Create-VnetGateway -ResourceGroup "paris" -location "northeurope" -IpPrefixGateway  $gwPrefix2
+
+    new-VnetConnection -ResourceGroup "moscow" -location "westeurope" -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+    new-VnetConnection -ResourceGroup "paris" -location "northeurope" -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+
     
-    make-pause -TimeMinutes 55
-
-    new-VnetConnection -ResourceGroup $rgEurope `
-                       -location $LocEurope `
-                       -ConnectionDSTResGroup $rgFrance `
-                       -SharedKey $sharedKeyVnet `
-                       -ConnectionType vnet2vnet
-
-    new-VnetConnection -ResourceGroup $rgFrance `
-                       -location $LocFrance `
-                       -ConnectionDSTResGroup $rgEurope `
-                       -SharedKey $sharedKeyVnet `
-                       -ConnectionType vnet2vnet
-        
-        
- 
 }
 end {
-
+    
 }
