@@ -31,7 +31,10 @@ begin {
   
     # Connect to Azure
     try {
-        Get-AzureRmSubscription
+        Write-host -ForegroundColor Green "Getting azure subscriptions"
+        $subscription = Get-AzureRmSubscription
+        Write-host -ForegroundColor Green "Selecting azure subscription with Id $($subscription.id)"
+        Set-AzureRmContext -SubscriptionId $subscription.Id
     }
     catch {
         Connect-AzureRmAccount
