@@ -10,7 +10,7 @@
 begin {
     
     # VM admin credentials
-    $cred = Get-Credential -Message "Please input creddentials for vm admin"
+    #$cred = Get-Credential -Message "Please input creddentials for vm admin"
     $sharedKeyVnet = 'Test123'
 
     
@@ -38,8 +38,8 @@ begin {
     }
 
     # Create resource group
-        New-AzureRmResourceGroup -Name "moscow" -Location "westeurope"
-        New-AzureRmResourceGroup -Name "paris"  -Location "northeurope"
+        New-AzureRmResourceGroup -Name "gomeltri" -Location "westeurope"
+        New-AzureRmResourceGroup -Name "orshatri"  -Location "northeurope"
 
 
 
@@ -123,8 +123,8 @@ begin {
                 Write-Host "Virtual network already exist"
             }
             else{
-                $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroup
-                $vmSubnet = New-AzureRmVirtualNetworkSubnetConfig -Name ("{0}-vm-subnet" -f $ResourceGroup) -AddressPrefix $IpPrefixVM -NetworkSecurityGroup $nsg
+               # $nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroup
+                $vmSubnet = New-AzureRmVirtualNetworkSubnetConfig -Name ("{0}-vm-subnet" -f $ResourceGroup) -AddressPrefix $IpPrefixVM #-NetworkSecurityGroup $nsg
                 New-AzureRmVirtualNetwork -Name ("{0}-vnet-01" -f $ResourceGroup) `
                                           -AddressPrefix $IpPrefixVirtNet `
                                           -Subnet $vmSubnet `
@@ -159,8 +159,9 @@ begin {
                     Write-host "Gateway subnet already exist"
                 }
                 else {
-                    $gwSubnet = Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
+                    Add-AzureRmVirtualNetworkSubnetConfig -Name "gatewaysubnet" -VirtualNetwork $virtNet -AddressPrefix $IpPrefixGateway
                     $virtNet | Set-AzureRmVirtualNetwork
+                    $gwSubnet = (Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroup).Subnets | Where-Object -Property name -eq "gatewaysubnet"
                 }
                 $gwPip = New-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroup -Name ("{0}-gw-pip-01" -f $ResourceGroup) -location $location -AllocationMethod Dynamic
                 $gwConfig = New-AzureRmVirtualNetworkGatewayIpConfig -Name $GwName -PublicIpAddress $GwPip -Subnet $gwSubnet
@@ -170,7 +171,8 @@ begin {
                                                  -IpConfigurations $gwConfig `
                                                  -GatewayType Vpn `
                                                  -VpnType RouteBased `
-                                                 -GatewaySku VpnGw1
+                                                 -GatewaySku VpnGw1 `
+                                                 -asjob
             }
             
         }
@@ -194,7 +196,7 @@ begin {
                 [String]$ConnectionType
 
             )
-
+            get-job | wait-job
             # Check for gateways exist
             try {
                 $gw1 = get-azurermvirtualnetworkgateway -ResourceGroupName $ResourceGroup
@@ -249,24 +251,24 @@ begin {
     }
 process {
 
-    create-StorAccount -ResourceGroup "moscow" -Location "westeurope"
-    create-StorAccount -ResourceGroup "paris" -Location "northeurope"
+   # create-StorAccount -ResourceGroup "gomeltri" -Location "westeurope"
+   # create-StorAccount -ResourceGroup "orshatri" -Location "northeurope"
 
-    Create-NetSecGroup -ResourceGroup "moscow" -location "westeurope"
-    Create-NetSecGroup -ResourceGroup "paris" -location "northeurope"
+  # Create-NetSecGroup -ResourceGroup "gomeltri" -location "westeurope"
+  # Create-NetSecGroup -ResourceGroup "orshatri" -location "northeurope"
 
-    Create-VMNetwork -ResourceGroup "moscow" -location "westeurope" -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
-    Create-VMNetwork -ResourceGroup "paris" -location "northeurope" -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
+    Create-VMNetwork -ResourceGroup "gomeltri" -location "westeurope" -IpPrefixVirtNet $virtNetPrefix1 -IpPrefixVM $vmNetPrefix1
+    Create-VMNetwork -ResourceGroup "orshatri" -location "northeurope" -IpPrefixVirtNet $virtNetPrefix2 -IpPrefixVM $vmNetPrefix2
 
-  #   Create-newVM -ResourceGroup "moscow" -location "westeurope" -VMName "web1" -$VMNumber 1
-  #  Create-newVM -ResourceGroup "paris" -location "northeurope" -VMName "web1" -$VMNumber 1
+  #  Create-newVM -ResourceGroup "gomeltri" -location "westeurope" -VMName "web1" -$VMNumber 1
+  #  Create-newVM -ResourceGroup "orshatri" -location "northeurope" -VMName "web1" -$VMNumber 1
     
 
-    Create-VnetGateway -ResourceGroup "moscow" -location "westeurope" -IpPrefixGateway  $gwPrefix1
-    Create-VnetGateway -ResourceGroup "paris" -location "northeurope" -IpPrefixGateway  $gwPrefix2
+    Create-VnetGateway -ResourceGroup "gomeltri" -location "westeurope" -IpPrefixGateway  $gwPrefix1
+    Create-VnetGateway -ResourceGroup "orshatri" -location "northeurope" -IpPrefixGateway  $gwPrefix2
 
-    new-VnetConnection -ResourceGroup "moscow" -location "westeurope" -ConnectionDSTResGroup "paris" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
-    new-VnetConnection -ResourceGroup "paris" -location "northeurope" -ConnectionDSTResGroup "moscow" -SharedKey $sharedKeyVnet -ConnectionType vnet2vnet
+    new-VnetConnection -ResourceGroup "gomeltri" -location "westeurope" -ConnectionDSTResGroup "orshatri" -SharedKey $sharedKeyVnet -ConnectionType "vnet2vnet"
+    new-VnetConnection -ResourceGroup "orshatri" -location "northeurope" -ConnectionDSTResGroup "gomeltri" -SharedKey $sharedKeyVnet -ConnectionType "vnet2vnet"
 
     
 }
